@@ -1,0 +1,186 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider     = "mysql"
+    url          = env("DATABASE_URL")
+    relationMode = "prisma"
+}
+
+model Account {
+    id                String   @id @default(cuid())
+    userId            String   @map("user_id")
+    type              String?
+    provider          String
+    providerAccountId String   @map("provider_account_id")
+    token_type        String?
+    refresh_token     String?  @db.Text
+    access_token      String?  @db.Text
+    expires_at        Int?
+    scope             String?
+    id_token          String?  @db.Text
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt
+    user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([provider, providerAccountId])
+    @@map("accounts")
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    userId       String?  @map("user_id")
+    sessionToken String   @unique @map("session_token") @db.VarChar(191)
+    accessToken  String?  @map("access_token") @db.Text
+    expires      DateTime
+    user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@map("sessions")
+}
+
+model User {
+    id                 String               @id @default(cuid())
+    name               String?
+    email              String?              @unique
+    emailVerified      DateTime?
+    image              String?
+    createdAt          DateTime             @default(now())
+    perfil             Int?                 @default(0)
+    privacyPolicy      Int?                 @default(0)
+    data_nascimento    DateTime?            @db.Date
+    contato            String?
+    cpf                String?              @unique
+    data_cadastro      DateTime?            @db.Date
+    accounts           Account[]
+    sessions           Session[]
+    parceiros          parceiros?
+    endereco           endereco?
+    pedido             pedido[]
+    avaliacao_parceiro avaliacao_parceiro[]
+
+    @@map("users")
+}
+
+model parceiros {
+    id                      String               @id @default(cuid())
+    usuario_id              String               @unique
+    cnpj                    String?
+    firstTime               Boolean?
+    active                  Boolean?
+    data_abertura           DateTime?            @db.Date
+    nome_fantasia           String?
+    nome_empresarial        String?
+    porte                   String?
+    atividade_principal     String?
+    atividade_secundaria    String?
+    ente_federativo         String?
+    situacao_cadastral      String?
+    nome_responsavel        String?
+    telefone_responsavel    String?
+    email_responsavel       String?
+    data_situacao_cadastral DateTime?            @db.Date
+    situacao_especial       String?
+    data_situacao_especial  DateTime?            @db.Date
+    logotipo                String?
+    data_cadastro           DateTime?            @db.Date
+    usuario                 User                 @relation(fields: [usuario_id], references: [id], onUpdate: Restrict, map: "parceiros_FK_1")
+    disponibilidade         disponibilidade[]
+    produto                 produto[]
+    parceiros_comida        parceiros_comida[]
+    pedido                  pedido[]
+    avaliacao_parceiro      avaliacao_parceiro[]
+
+    @@unique([cnpj, nome_fantasia, nome_empresarial, usuario_id], map: "parceiros_un")
+}
+
+model avaliacao_parceiro {
+    id             Int       @id @default(autoincrement())
+    parceiro_id    String
+    avaliacao      Float
+    data_avaliacao DateTime
+    avaliador_id   String
+    avaliador      User      @relation(fields: [avaliador_id], references: [id], onUpdate: Restrict, map: "avaliador_FK_1")
+    parceiro       parceiros @relation(fields: [parceiro_id], references: [id], onUpdate: Restrict, map: "parceiros_avaliado_FK_1")
+}
+
+model endereco {
+    id          Int     @id @default(autoincrement())
+    id_usuario  String  @unique
+    cep         String
+    logradouro  String?
+    bairro      String?
+    localidade  String?
+    uf          String?
+    complemento String?
+    casa        String?
+    usuario     User    @relation(fields: [id_usuario], references: [id], onUpdate: Restrict, map: "usuario_FK_endereco")
+}
+
+model disponibilidade {
+    id             Int       @id @default(autoincrement())
+    id_parceiro    String
+    dia_semana     Int
+    horario_inicio DateTime  @db.Time(6)
+    horario_fim    DateTime  @db.Time(6)
+    parceiros      parceiros @relation(fields: [id_parceiro], references: [id], onUpdate: Cascade, onDelete: Cascade, map: "parceiros_FK_disponibilidade")
+}
+
+model produto {
+    id                 Int                  @id @default(autoincrement())
+    id_parceiro        String
+    nome               String?
+    foto               String?
+    preco              Float?
+    descricao          String?
+    status             Boolean?
+    data_cadastro      DateTime?            @db.Date
+    parceiros          parceiros            @relation(fields: [id_parceiro], references: [id], onUpdate: Cascade, onDelete: Cascade, map: "parceiros_FK_produto")
+    produto_restricoes produto_restricoes[]
+}
+
+model produto_restricoes {
+    id_produto      Int
+    id_restricoes   Int
+    produto         produto         @relation(fields: [id_produto], references: [id], onUpdate: Cascade, onDelete: Cascade, map: "restricoes_FK_produto")
+    tipo_restricoes tipo_restricoes @relation(fields: [id_restricoes], references: [id], onUpdate: Restrict, map: "produto_FK_restricoes")
+
+    @@id([id_produto, id_restricoes])
+}
+
+model tipo_restricoes {
+    id                 Int                  @id
+    descricao          String?
+    produto_restricoes produto_restricoes[]
+}
+
+model pedido {
+    id          Int       @id @default(autoincrement())
+    id_parceiro String
+    id_usuario  String
+    status      String?
+    agendamento String?   @db.LongText
+    valor_total Float?
+    avaliacao   Int?
+    data_pedido DateTime? @db.Date
+    parceiros   parceiros @relation(fields: [id_parceiro], references: [id], onUpdate: Restrict, map: "parceiro_FK_pedido")
+    usuario     User      @relation(fields: [id_usuario], references: [id], onUpdate: Restrict, map: "usuario_FK_pedido")
+}
+
+model tipo_comida {
+    id               Int                @id
+    descricao        String?
+    parceiros_comida parceiros_comida[]
+    
+}
+
+model parceiros_comida {
+    id Int @id @default(autoincrement())
+    id_parceiro String
+    id_comida   Int
+    parceiros   parceiros   @relation(fields: [id_parceiro], references: [id], onUpdate: Cascade, onDelete: Cascade, map: "parceiro_FK_comida")
+    tipo_comida tipo_comida @relation(fields: [id_comida], references: [id], onUpdate: Cascade, onDelete: Cascade, map: "comida_FK_parceiro")
+
+}
